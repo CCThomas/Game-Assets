@@ -1,2 +1,2 @@
-# Game-Scripts
-C# Scripts written for Unity
+# Game-Assets
+C# Scripts and Blender Assets for Unity
