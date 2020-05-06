@@ -5,160 +5,138 @@ using System.Collections.Specialized;
 using System.Security.Cryptography;
 using UnityEngine;
 
-public class PlayerController : MonoBehaviour {
+public class PlayerController : MonoBehaviour
+{
 
-    // // Player
-    // public float walkSpeed = 2;
-    // public float runSpeed = 6;
-    // public float currentSpeed;
-    // public float gravity = -12;
-    // public float jumpHeight = 1f;
-    // float velocityY;
+    // Player
+    public float walkSpeed = 2;
+    public float runSpeed = 6;
+    public float currentSpeed;
+    public float gravity = -12;
+    public float jumpHeight = 1f;
+    float velocityY;
+    [Range(0, 1)]
+    public float airControlPercent;
 
-    // public float speedSmoothTime = 0.1f;
-    // float speedSmoothVelocity;
+    public float speedSmoothTime = 0.1f;
+    float speedSmoothVelocity;
 
-    // public float turnSmoothTime = 0.2f;
-    // float turnSmoothVelocity;
-
-    // public Transform cameraTransform;
-    // public CharacterController controller;
-    // Animator animator;
-
-    // // Start is called before the first frame update
-    // void Start() {
-    //     animator = GetComponent<Animator>();
-    //     cameraTransform = Camera.main.transform;
-    //     controller = GetComponent<CharacterController>();
-    // }
-
-    // // Update is called once per frame
-    // void Update() {
-    //     Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
-    //     Vector2 inputDirection = input.normalized;
-
-    //     if (Input.GetKey(KeyCode.Space)) {
-    //         Jump();
-    //     }
-
-    //     // Rotate player to face input direction.
-    //     // If statement stops the player from reseting it's direction if the user is not pressing a key.
-    //     if (inputDirection != Vector2.zero) {
-    //         float targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.y) * Mathf.Rad2Deg + cameraTransform.eulerAngles.y;
-    //         transform.eulerAngles = Vector3.up * Mathf.SmoothDampAngle(transform.eulerAngles.y, targetRotation, ref turnSmoothVelocity, turnSmoothTime);
-    //     }
-
-    //     // Determines if the Player is currently running.
-    //     bool running = Input.GetKey(KeyCode.LeftShift);
-
-    //     // If magnitude is zero, player is not moving and speed should be set to zero.
-    //     float targetSpeed = (running ? runSpeed : walkSpeed) * inputDirection.magnitude;
-    //     currentSpeed = Mathf.SmoothDamp(currentSpeed, targetSpeed, ref speedSmoothVelocity, speedSmoothTime);
+    public float turnSmoothTime = 0.2f;
+    float turnSmoothVelocity;
+	bool crouching;
 
 
-    //     // Move Player
-    //     velocityY += Time.deltaTime * gravity;
-    //    Vector3 velocity = transform.forward * currentSpeed + Vector3.up * velocityY;
-    //    controller.Move(velocity * Time.deltaTime);
-    //    currentSpeed = new Vector2(controller.velocity.x, controller.velocity.z).magnitude;
+    Animator animator;
+    Transform cameraTransform;
+    CharacterController characterController;
+    Transform modelTransform;
 
-    //    if (controller.isGrounded) {
-    //        velocityY = 0;
-    //    }
+    // Start is called before the first frame update
+    void Start()
+    {
+        characterController = GetComponent<CharacterController>();
 
-    //     // Update Animation. Look at Animator View for more information on the games animations for a player.
-    //     float animationSpeedPercent = running ? currentSpeed/runSpeed : currentSpeed/walkSpeed *.5f;
-    //     animator.SetFloat("speedPercent", animationSpeedPercent, speedSmoothTime, Time.deltaTime);
-    // }
+        modelTransform = transform.GetChild((int)PlayerChild.Graphics);
+        animator = GetComponentInChildren<Animator>();
+        cameraTransform = transform.GetChild((int)PlayerChild.Camera);
+        CameraController cameraController = (CameraController)cameraTransform.GetComponent("CameraController");
+        cameraController.SetThirdPersonTarget(transform.GetChild((int)PlayerChild.CameraFocus));
+    }
 
-    // void LateUpdate() {
-    // }
+    // Update is called once per frame
+    void Update()
+    {
+        Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+        Vector2 inputDirection = input.normalized;
+        Debug.Log(inputDirection.x + "," + inputDirection.y);
 
-    // void Jump() {
-    //     if (controller.isGrounded) {
-    //         float jumpVelocity = Mathf.Sqrt(-2 * gravity * jumpHeight);
-    //         velocityY = jumpVelocity;
-    //     }
-    // }
-    
-	public float walkSpeed = 2;
-	public float runSpeed = 6;
-	public float gravity = -12;
-	public float jumpHeight = 1;
-	[Range(0,1)]
-	public float airControlPercent;
+        // Determines if the Player is currently running.
+        bool running = Input.GetKey(KeyCode.LeftShift);
 
-	public float turnSmoothTime = 0.2f;
-	float turnSmoothVelocity;
+        Move(inputDirection, running);
 
-	public float speedSmoothTime = 0.1f;
-	float speedSmoothVelocity;
-	float currentSpeed;
-	float velocityY;
-
-	Animator animator;
-	Transform cameraT;
-	CharacterController controller;
-
-	void Start () {
-		animator = GetComponent<Animator> ();
-		cameraT = Camera.main.transform;
-		controller = GetComponent<CharacterController> ();
-	}
-
-	void Update () {
-		// input
-		Vector2 input = new Vector2 (Input.GetAxisRaw ("Horizontal"), Input.GetAxisRaw ("Vertical"));
-		Vector2 inputDir = input.normalized;
-		bool running = Input.GetKey (KeyCode.LeftShift);
-
-		Move (inputDir, running);
-
-		if (Input.GetKeyDown (KeyCode.Space)) {
-			Jump ();
+		if (Input.GetKeyDown(KeyCode.LeftControl)) {
+			Crouch();
 		}
-		// animator
-		float animationSpeedPercent = ((running) ? currentSpeed / runSpeed : currentSpeed / walkSpeed * .5f);
-		animator.SetFloat ("speedPercent", animationSpeedPercent, speedSmoothTime, Time.deltaTime);
+        if (Input.GetKey(KeyCode.Space))
+        {
+            Jump();
+        }
 
-	}
+        // Update Animation. Look at Animator View for more information on the games animations for a player.
+        float animationSpeedPercent = running ? currentSpeed / runSpeed : currentSpeed / walkSpeed * .5f;
+        animationSpeedPercent *= crouching ? 0.5f : 1;
+        animator.SetFloat("speedPercent", animationSpeedPercent, speedSmoothTime, Time.deltaTime);
+    }
 
-	void Move(Vector2 inputDir, bool running) {
-		if (inputDir != Vector2.zero) {
-			float targetRotation = Mathf.Atan2 (inputDir.x, inputDir.y) * Mathf.Rad2Deg + cameraT.eulerAngles.y;
-			transform.eulerAngles = Vector3.up * Mathf.SmoothDampAngle(transform.eulerAngles.y, targetRotation, ref turnSmoothVelocity, GetModifiedSmoothTime(turnSmoothTime));
-		}
-			
-		float targetSpeed = ((running) ? runSpeed : walkSpeed) * inputDir.magnitude;
-		currentSpeed = Mathf.SmoothDamp (currentSpeed, targetSpeed, ref speedSmoothVelocity, GetModifiedSmoothTime(speedSmoothTime));
+    void LateUpdate()
+    {
+    }
 
-		velocityY += Time.deltaTime * gravity;
-		Vector3 velocity = transform.forward * currentSpeed + Vector3.up * velocityY;
+    float GetModifiedSmoothTime(float smoothTime)
+    {
+        if (characterController.isGrounded)
+        {
+            return smoothTime;
+        }
 
-		controller.Move (velocity * Time.deltaTime);
-		currentSpeed = new Vector2 (controller.velocity.x, controller.velocity.z).magnitude;
+        if (airControlPercent == 0)
+        {
+            return float.MaxValue;
+        }
+        return smoothTime / airControlPercent;
+    }
 
-		if (controller.isGrounded) {
-			velocityY = 0;
-		}
-
-	}
-
-	void Jump() {
-		if (controller.isGrounded) {
-			float jumpVelocity = Mathf.Sqrt (-2 * gravity * jumpHeight);
-			velocityY = jumpVelocity;
+	void Crouch() {
+		crouching = !crouching;
+		animator.SetBool("crouching", crouching);
+		if (crouching) {
+			characterController.height = 1.20f;
+			characterController.center = new Vector3(0, 0.65f, 0);
+		} else {
+			characterController.height = 1.74f;
+			characterController.center = new Vector3(0, 0.87f, 0);
 		}
 	}
 
-	float GetModifiedSmoothTime(float smoothTime) {
-		if (controller.isGrounded) {
-			return smoothTime;
-		}
+    void Jump()
+    {
+        if (characterController.isGrounded)
+        {
+            float jumpVelocity = Mathf.Sqrt(-2 * gravity * jumpHeight);
+            velocityY = jumpVelocity;
+        }
+    }
 
-		if (airControlPercent == 0) {
-			return float.MaxValue;
-		}
-		return smoothTime / airControlPercent;
-	}
+    void Move(Vector2 inputDirection, bool running)
+    {
+        // Rotate player to face input direction.
+        float targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.y) * Mathf.Rad2Deg + cameraTransform.eulerAngles.y;
+        modelTransform.eulerAngles = Vector3.up * Mathf.SmoothDampAngle(modelTransform.eulerAngles.y, targetRotation, ref turnSmoothVelocity, GetModifiedSmoothTime(turnSmoothTime));
+
+        // If magnitude is zero, player is not moving and speed should be set to zero.
+        float targetSpeed = running ? runSpeed : walkSpeed;
+        targetSpeed *= crouching ? .5f : 1;
+        targetSpeed *= inputDirection.magnitude;
+        currentSpeed = Mathf.SmoothDamp(currentSpeed, targetSpeed, ref speedSmoothVelocity, GetModifiedSmoothTime(speedSmoothTime));
+
+        // Move Player
+        velocityY += Time.deltaTime * gravity;
+        Vector3 velocity = modelTransform.forward * currentSpeed + Vector3.up * velocityY;
+        characterController.Move(velocity * Time.deltaTime);
+        currentSpeed = new Vector2(characterController.velocity.x, characterController.velocity.z).magnitude;
+
+        // Set Velcity Y to zero is the player is on the ground (done falling)
+        if (characterController.isGrounded)
+        {
+            velocityY = 0;
+        }
+    }
+}
+
+enum PlayerChild
+{
+    Camera = 1,
+    CameraFocus = 2,
+    Graphics = 0
 }
