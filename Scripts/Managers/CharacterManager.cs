@@ -8,7 +8,7 @@ using System.Runtime.ExceptionServices;
 public class CharacterManager {
     // Variables Needed
     Transform transform;
-    MyCreature creature;
+    Character character;
     Rigidbody rigidbody;
 
     // Variables Set
@@ -23,15 +23,15 @@ public class CharacterManager {
     float turnSmoothTime = 0.1f;
 
     // Trackers
-    public bool crouch, run, jump, grounded, fly, slide;
+    public bool crouch, run, jump, grounded, fly, slide, climb;
     float velocitySpeedSmooth, VelocityTurnSmooth, timeSpentSliding;
     Vector3 animationTracker;
-    Transform hold;
+    RaycastHit hold;
 
-    public CharacterManager(Transform transform, MyCreature creature) {
+    public CharacterManager(Transform transform, Character character) {
         this.transform = transform;
         this.rigidbody = transform.GetComponent<Rigidbody>();
-        this.creature = creature;
+        this.character = character;
     }
 
     public bool AttemptSetCrouch(bool desired) {
@@ -53,13 +53,19 @@ public class CharacterManager {
 
         if (crouch && modelType == ModelType.Humanoid) {
             collider.height = .8f;
+            collider.center = new Vector3(0, .5f * .8f, 0);
         } else if (!crouch && modelType == ModelType.Humanoid) {
             collider.height = 1;
+            collider.center = new Vector3(0, .5f, 0);
         }
         return crouch == desired;
     }
 
     public bool AttemptSetJump(bool desired) {
+        if (climb) {
+            climb = false;
+            SetClimbing(false);
+        }
         if (slide) {
             return jump == desired;
         }
@@ -67,8 +73,9 @@ public class CharacterManager {
             if (grounded && AttemptSetCrouch(false)) {
                 jump = true;
                 AttemptSetRun(false);
-            } else if (!grounded && modelType == ModelType.Bird) {
+            } else if (!grounded) {
                 fly = true;
+                SetSwimming(true);
             }
         }
         return jump == desired;
@@ -108,6 +115,16 @@ public class CharacterManager {
         return graphics.Find(path);
     }
 
+    public Transform GetHand() {
+        string path = "path";
+        if (modelType == ModelType.Bird) {
+            return transform;
+        } else if (modelType == ModelType.Humanoid) {
+            path = "Armature/Hip/Stomach/Chest/Bicep.L/Forearm.L/Hand.L";
+        }
+        return graphics.Find(path);
+    }
+
     public Transform GetHead() {
         string path = "path";
         if (modelType == ModelType.Bird) {
@@ -119,8 +136,12 @@ public class CharacterManager {
     }
 
     public void OnCollisionStay() {
+        if (climb) {
+            return;
+        }
         grounded = true;
         fly = false;
+        SetSwimming(false);
     }
 
     public void UpdateGraphics(ModelType modelType, Transform graphics) {
@@ -164,7 +185,8 @@ public class CharacterManager {
         velocityChange.x = Mathf.Clamp(velocityChange.x, -maxVelocityChange, maxVelocityChange);
         velocityChange.z = Mathf.Clamp(velocityChange.z, -maxVelocityChange, maxVelocityChange);
 
-        if (fly) {
+        if (climb) {
+        } else if (fly) {
             // Rotate Player
             transform.forward = lookingDirection;
 
@@ -184,13 +206,18 @@ public class CharacterManager {
                 // Jump
                 if (jump) {
                     jump = false;
-                    float verticalSpeed = Mathf.Sqrt(2 * creature.GetAbilityValue("jump_height") * gravity);
+                    float verticalSpeed = Mathf.Sqrt(2 * character.GetAbilityValue("jump_height") * gravity);
                     rigidbody.velocity = new Vector3(velocity.x, verticalSpeed, velocity.z);
                 }
 
             } else {
                 if (modelType == ModelType.Humanoid && CanGrabHold(lookingDirection)) {
                     // TODO
+                    climb = true;
+                    CapsuleCollider collider = graphics.GetComponent<CapsuleCollider>();
+                    collider.enabled = false;
+                    SetClimbing(true);
+                    GetHand().position = hold.point;
                     Debug.Log("Implement Climbing");
                 }
             }
@@ -200,11 +227,6 @@ public class CharacterManager {
 
             grounded = false;
         }
-
-        Debug.Log("before=" + graphics.GetChild(0).position);
-        graphics.GetChild(0).position = new Vector3(0, 0, 0);
-        Debug.Log("aftyer=" + graphics.GetChild(0).position);
-        graphics.GetChild(1).position *= 0;
     }
 
     public void UpdateAnimation() {
@@ -220,7 +242,7 @@ public class CharacterManager {
         LayerMask holdLayerMask = LayerMask.GetMask("Hold");
         RaycastHit hit = Raycast(origin, lookingDirection, .8f, holdLayerMask, Color.green);
         if (hit.collider != null) {
-            //holdRaycastHit = hit;
+            hold = hit;
             return true;
         }
         return false;
@@ -239,7 +261,7 @@ public class CharacterManager {
             return smoothTime;
         }
 
-        float airControlPercent = creature.GetAbilityValue("air_control_percent");
+        float airControlPercent = character.GetAbilityValue("air_control_percent");
         if (airControlPercent == 0) {
             return float.MaxValue;
         }
@@ -247,13 +269,13 @@ public class CharacterManager {
     }
 
     float GetSpeed() {
-        float movingSpeed = creature.GetAbilityValue("speed_walk");
+        float movingSpeed = character.GetAbilityValue("speed_walk");
         if (slide) {
-            movingSpeed = creature.GetAbilityValue("speed_run");
+            movingSpeed = character.GetAbilityValue("speed_run");
         } else if (crouch) {
-            movingSpeed = creature.GetAbilityValue("speed_crouch");
+            movingSpeed = character.GetAbilityValue("speed_sneak");
         } else if (run) {
-            movingSpeed = creature.GetAbilityValue("speed_run");
+            movingSpeed = character.GetAbilityValue("speed_run");
         }
         return movingSpeed;
     }
@@ -265,6 +287,11 @@ public class CharacterManager {
         return hit;
     }
 
+    void SetClimbing(bool climbing) {
+        animator.SetBool("climbing", climbing);
+    }
+
+
     void SetCrouching(bool crouching) {
         animator.SetBool("crouching", crouching);
     }
@@ -275,6 +302,10 @@ public class CharacterManager {
 
     void SetSliding(bool sliding) {
         animator.SetBool("sliding", sliding);
+    }
+
+    void SetSwimming(bool swimming) {
+        animator.SetBool("swimming", swimming);
     }
 
     void SetSpeedForward(float speedForward, float dampTime) {

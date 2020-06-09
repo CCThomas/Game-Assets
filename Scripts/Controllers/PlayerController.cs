@@ -8,7 +8,7 @@ public class PlayerController : MonoBehaviour {
     // Object
     public string startGraphicKey;
     public List<Graphic> graphics;
-    public MyCreature creature;
+    public Character character;
     CharacterManager characterManager;
     Dictionary<string, Transform> graphicsDict;
 
@@ -42,10 +42,10 @@ public class PlayerController : MonoBehaviour {
 
     // Use this for initialization
     void Start() {
-        creature.Initialize();
+        character.Initialize();
         graphicsDict = Graphic.ToDictionary(graphics);
 
-        characterManager = new CharacterManager(transform, creature);
+        characterManager = new CharacterManager(transform, character);
         characterManager.UpdateGraphics(CharacterManager.ModelType.Humanoid, graphicsDict[startGraphicKey]);
 
         cameraManager = new CameraManager(transform, firstPersonLayers, thirdPersonLayers);
@@ -119,7 +119,7 @@ public class PlayerController : MonoBehaviour {
 
     void SwitchModel() {
         if (characterManager.modelType == CharacterManager.ModelType.Bird) {
-            characterManager.UpdateGraphics(CharacterManager.ModelType.Humanoid, GetGraphic("bipedalnverse")); ;
+            characterManager.UpdateGraphics(CharacterManager.ModelType.Humanoid, GetGraphic("human")); ;
         } else if (characterManager.modelType == CharacterManager.ModelType.Humanoid) {
             characterManager.UpdateGraphics(CharacterManager.ModelType.Bird, GetGraphic("bird"));
         }

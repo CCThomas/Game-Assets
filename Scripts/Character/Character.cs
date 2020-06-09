@@ -34,7 +34,10 @@ public class Character : ScriptableObject {
         if (!intialized) {
             intialized = true;
             Debug.Log(traitsDictionary);
-            foreach (TraitModifier traitModifier in race.modifiers) {
+            List<TraitModifier> modifiers = new List<TraitModifier>();
+            modifiers.AddRange(race.requiredModifiers);
+            modifiers.AddRange(race.additionalModifiers);
+            foreach (TraitModifier traitModifier in modifiers) {
                 if (traitModifier.type == TraitModifierType.Ability) {
                     abilityDictionary[traitModifier.key].value *= traitModifier.modifier;
                 } else if (traitModifier.type == TraitModifierType.Trait) {
